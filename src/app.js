@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
+import { notFound, errorHandler } from './middleware/error-handler.js';
 
 const app = express();
 
@@ -14,7 +15,7 @@ app.use(
     max: 100,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { error: true, message: 'Too many requests, please try again later.' },
+    message: { error: true, mensaje: 'Demasiadas peticiones, prueba más tarde.' },
   })
 );
 
@@ -27,8 +28,8 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.use((_req, res) => {
-  res.status(404).json({ error: true, message: 'Route not found' });
-});
+
+app.use(notFound);
+app.use(errorHandler);
 
 export default app;
