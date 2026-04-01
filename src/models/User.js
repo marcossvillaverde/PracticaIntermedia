@@ -47,6 +47,7 @@ const userSchema = new mongoose.Schema(
       index: true,
     },
     address: { type: addressSchema },
+    refreshToken: { type: String, default: null, select: false },
     deleted: { type: Boolean, default: false, index: true },
   },
   {

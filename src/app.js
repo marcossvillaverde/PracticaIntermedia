@@ -4,6 +4,7 @@ import cors from 'cors';
 import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
 import { notFound, errorHandler } from './middleware/error-handler.js';
+import userRoutes from './routes/user.routes.js';
 
 const app = express();
 
@@ -28,7 +29,7 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-
+app.use('/api/user', userRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
