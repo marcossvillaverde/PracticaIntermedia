@@ -119,3 +119,63 @@ export const login = async (req, res, next) => {
     next(err);
   }
 };
+
+// PUT /api/user/register (datos personales
+export const updatePersonalData = async (req, res, next) => {
+  try {
+    const { name, lastName, nif, address } = req.body;
+
+    const usuario = await User.findByIdAndUpdate(
+      req.user._id,
+      { name, lastName, nif, address },
+      { new: true, runValidators: true }
+    );
+
+    res.json({ mensaje: 'Datos personales actualizados', usuario });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PATCH /api/user/company
+export const updateCompany = async (req, res, next) => {
+  try {
+    const usuario = await User.findById(req.user._id);
+    const { isFreelance, name, cif, address } = req.body;
+
+    let cifFinal = cif;
+    let nombreFinal = name;
+    let direccionFinal = address;
+
+    // Si es autónomo, usamos sus datos personales
+    if (isFreelance) {
+      cifFinal = usuario.nif;
+      nombreFinal = `${usuario.name} ${usuario.lastName}`;
+      direccionFinal = usuario.address;
+    }
+
+    // Buscar si ya existe una compañía con ese CIF
+    let company = await Company.findOne({ cif: cifFinal, deleted: false });
+
+    if (company) {
+      // Ya existe -> el usuario se une como guest
+      usuario.role = 'guest';
+    } else {
+      // No existe -> crear nueva compañía
+      company = await Company.create({
+        owner: usuario._id,
+        name: nombreFinal,
+        cif: cifFinal,
+        address: direccionFinal,
+        isFreelance: isFreelance ?? false,
+      });
+    }
+
+    usuario.company = company._id;
+    await usuario.save();
+
+    res.json({ mensaje: 'Compañía asignada correctamente', company });
+  } catch (err) {
+    next(err);
+  }
+};
