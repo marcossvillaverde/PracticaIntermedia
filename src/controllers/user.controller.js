@@ -179,3 +179,87 @@ export const updateCompany = async (req, res, next) => {
     next(err);
   }
 };
+
+// PATCH /api/user/logo
+export const uploadLogo = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return next(AppError.badRequest('No se ha subido ninguna imagen'));
+    }
+
+    const usuario = await User.findById(req.user._id);
+
+    if (!usuario.company) {
+      return next(AppError.badRequest('El usuario no tiene una compañía asignada'));
+    }
+
+    const logoUrl = `${config.publicUrl}/uploads/${req.file.filename}`;
+
+    const company = await Company.findByIdAndUpdate(
+      usuario.company,
+      { logo: logoUrl },
+      { new: true }
+    );
+
+    res.json({ mensaje: 'Logo actualizado correctamente', logo: company.logo });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/user
+export const getUser = async (req, res, next) => {
+  try {
+    const usuario = await User.findById(req.user._id)
+      .populate('company');
+
+    res.json({ usuario });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// DELETE /api/user
+export const deleteUser = async (req, res, next) => {
+  try {
+    const { soft } = req.query;
+    const usuario = await User.findById(req.user._id);
+
+    if (soft === 'true') {
+      // Soft delete — borrado lógico
+      usuario.deleted = true;
+      usuario.refreshToken = null;
+      await usuario.save();
+    } else {
+      // Hard delete — borrado físico
+      await User.findByIdAndDelete(req.user._id);
+    }
+
+    notificationService.emit('user:deleted', { email: usuario.email });
+
+    res.json({ mensaje: 'Usuario eliminado correctamente' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PUT /api/user/password
+export const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    const usuario = await User.findById(req.user._id).select('+password');
+
+    const passwordOk = await compare(currentPassword, usuario.password);
+    if (!passwordOk) {
+      return next(AppError.unauthorized('La contraseña actual es incorrecta'));
+    }
+
+    usuario.password = await encrypt(newPassword);
+    await usuario.save();
+
+    res.json({ mensaje: 'Contraseña actualizada correctamente' });
+  } catch (err) {
+    next(err);
+  }
+};
