@@ -157,7 +157,7 @@ export const updateCompany = async (req, res, next) => {
     // Buscar si ya existe una compañía con ese CIF
     let company = await Company.findOne({ cif: cifFinal, deleted: false });
 
-    if (company) {
+    if (company && company.owner.toString() !== usuario._id.toString()) {
       // Ya existe -> el usuario se une como guest
       usuario.role = 'guest';
     } else {
@@ -259,6 +259,97 @@ export const changePassword = async (req, res, next) => {
     await usuario.save();
 
     res.json({ mensaje: 'Contraseña actualizada correctamente' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/user/invite
+export const inviteUser = async (req, res, next) => {
+  try {
+    const { email, name, lastName } = req.body;
+    const usuarioAdmin = req.user;
+
+    if (!usuarioAdmin.company) {
+      return next(AppError.badRequest('Debes tener una compañía asignada para invitar compañeros'));
+    }
+
+    // Comprobar si ya existe un usuario con ese email
+    const existente = await User.findOne({ email });
+    if (existente) {
+      return next(AppError.conflict('Ya existe un usuario con ese email'));
+    }
+
+    // Crear usuario invitado con contraseña temporal
+    const passwordTemporal = Math.random().toString(36).slice(-8);
+    const passwordHash = await encrypt(passwordTemporal);
+    const verificationCode = generarCodigo();
+
+    const usuarioInvitado = await User.create({
+      email,
+      name,
+      lastName,
+      password:             passwordHash,
+      role:                 'guest',
+      company:              usuarioAdmin.company,
+      verificationCode,
+      verificationAttempts: 3,
+    });
+
+    notificationService.emit('user:invited', {
+      email,
+      invitadoPor: usuarioAdmin.email,
+    });
+
+    res.status(201).json({
+      mensaje:  'Usuario invitado correctamente',
+      usuario: {
+        _id:      usuarioInvitado._id,
+        email:    usuarioInvitado.email,
+        role:     usuarioInvitado.role,
+        company:  usuarioInvitado.company,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/user/refresh
+export const refresh = async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return next(AppError.badRequest('El refresh token es obligatorio'));
+    }
+
+    const usuario = await User.findOne({ refreshToken, deleted: false });
+
+    if (!usuario) {
+      return next(AppError.unauthorized('Refresh token inválido o expirado'));
+    }
+
+    const nuevoRefreshToken = generateRefreshToken();
+    usuario.refreshToken = nuevoRefreshToken;
+    await usuario.save();
+
+    const accessToken = generateAccessToken(usuario);
+
+    res.json({ accessToken, refreshToken: nuevoRefreshToken });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/user/logout
+export const logout = async (req, res, next) => {
+  try {
+    const usuario = await User.findById(req.user._id);
+    usuario.refreshToken = null;
+    await usuario.save();
+
+    res.json({ mensaje: 'Sesión cerrada correctamente' });
   } catch (err) {
     next(err);
   }

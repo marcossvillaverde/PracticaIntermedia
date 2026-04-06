@@ -11,9 +11,11 @@ import {
   getUser,
   deleteUser,
   changePassword,
+  inviteUser,
 } from '../controllers/user.controller.js';
 import { validate } from '../middleware/validate.js';
 import authMiddleware from '../middleware/auth.middleware.js';
+import checkRole from '../middleware/role.middleware.js';
 import upload from '../middleware/upload.js';
 import {
   registerSchema,
@@ -22,6 +24,7 @@ import {
   personalDataSchema,
   companyDataBodySchema,
   changePasswordSchema,
+  inviteSchema,
 } from '../validators/user.validator.js';
 
 const router = Router();
@@ -47,7 +50,7 @@ router.put('/register', authMiddleware, validate(personalDataSchema), updatePers
 // Onboarding —> datos de compañía
 router.patch('/company', authMiddleware, validate(companyDataBodySchema), updateCompany);
 
-// Logo de la compañía
+// Logo de la compañia
 router.patch('/logo', authMiddleware, upload.single('logo'), uploadLogo);
 
 // Obtener usuario autenticado
@@ -58,5 +61,8 @@ router.delete('/', authMiddleware, deleteUser);
 
 // Cambiar contraseña
 router.put('/password', authMiddleware, validate(changePasswordSchema), changePassword);
+
+// Invitar compañero (solo admin)
+router.post('/invite', authMiddleware, checkRole(['admin']), validate(inviteSchema), inviteUser);
 
 export default router;
